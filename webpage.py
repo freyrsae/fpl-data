@@ -1,5 +1,5 @@
 import streamlit as st
-from fpl import plot_diff_from_mean
+from fpl import plot_diff_from_mean, player_selections_across_league
 
 st.set_page_config(layout="wide")
 try:
@@ -11,5 +11,9 @@ except Exception:
 league_id = st.text_input(label="League ID", value=league_id_q)
 
 if league_id:
+    st.markdown('## Points through the season')
     st.bokeh_chart(plot_diff_from_mean(int(league_id)), use_container_width=True)
+
+    st.markdown('## Current week player selection')
+    st.dataframe(player_selections_across_league(int(league_id)), use_container_width=True, hide_index=True, column_order=['name', 'points', 'captain', 'vice captain', 'normal', 'bench'])
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import HoverTool
 from bokeh.palettes import Category20_20
+import pandas as pd
 from pandas import DataFrame
 from bokeh.models import ColumnDataSource, Div, Select, Slider, TextInput
 
@@ -39,8 +40,9 @@ def fetch_league_info(league_id: int) -> LeagueInfo:
         entries=[entry_from_standings(e) for e in r['standings']['results']]
     )
 
+@cache
 def fetcht_current_gameweek() -> int:
-    return 19  # todo infer from bootstrap-static/ events data
+    return min([e['id'] for e in fetch_bootstrap_static()['events'] if e['is_current']])
 
 @cache
 def fetch_bootstrap_static():
@@ -50,7 +52,7 @@ def fetch_bootstrap_static():
 
 @cache
 def fetch_events():
-    return [e['id'] for e in fetch_bootstrap_static()['events'] if e['finished']]
+    return [e['id'] for e in fetch_bootstrap_static()['events'] if e['average_entry_score'] > 0]
 
 def extract_all_player_names() -> DataFrame:
     return DataFrame.from_dict({p['id']: {'display_name': p['web_name']} for p in fetch_bootstrap_static()['elements']}, orient='index')
@@ -85,12 +87,71 @@ def fetch_player_info(player_id: int):
     r = requests.get(base_url + f"element-summary/{player_id}").json()
     pprint(r, indent=2, depth=3, compact=True)
 
+@cache
+def element_names() -> dict[int, str]:
+    return {e['id']: e['web_name'] for e in fetch_bootstrap_static()['elements']}
+
+@dataclass
+class Pick:
+    element: int
+    is_captain: bool
+    is_vice_captain: bool
+    multiplier: int
+
 def fetch_picks(manager_id: int, event_id: int):
     r = requests.get(base_url + f"entry/{manager_id}/event/{event_id}/picks/").json()
-    pprint(r, indent=2, depth=3, compact=True)
+    # pprint(r, indent=2, depth=3, compact=True)
+    return [Pick(
+                element=p['element'],
+                is_captain=p['is_captain'],
+                is_vice_captain=p['is_vice_captain'],
+                multiplier=p['multiplier'],
+            ) for p in r['picks']]
 
 def prepend_to_events_length(ls: list, n: int, default_value = 0):
     return [default_value] * (n - len(ls)) + ls
+
+@cache
+def player_points(event_id: int) -> dict[int, int]:
+    r = requests.get(base_url + f"event/{event_id}/live/").json()
+    # pprint(r, indent=2, depth=3, compact=True)
+    return {e['id']: e['stats']['total_points']for e in r['elements']}
+
+def player_selections_across_league(league_id: int):
+    league_info = fetch_league_info(league_id)
+    gw = fetcht_current_gameweek()
+    names = {}
+    points = {}
+    player_selections = {}
+    captain_selections = {}
+    vice_captain_selections = {}
+    bench_selections = {}
+    for entry in league_info.entries:
+        current_picks = fetch_picks(entry.team_id, gw)
+        for pick in current_picks:
+            if pick.is_captain:
+                add_to_dict_list(captain_selections, pick.element, entry.name)
+            elif pick.is_vice_captain:
+                add_to_dict_list(vice_captain_selections, pick.element, entry.name)
+            elif pick.multiplier == 1:
+                add_to_dict_list(player_selections, pick.element, entry.name)
+            elif pick.multiplier == 0:
+                add_to_dict_list(bench_selections, pick.element, entry.name)
+
+            if(not names.get(pick.element)):
+                names[pick.element] = element_names()[pick.element]
+            if (not points.get(pick.element)):
+                points[pick.element] = player_points(gw)[pick.element]
+
+    df = pd.concat([pd.Series(d) for d in [captain_selections, vice_captain_selections, player_selections, bench_selections, names, points]], axis=1)
+    df.columns = ['captain', 'vice captain', 'normal', 'bench', 'name', 'points']
+    return df
+
+def add_to_dict_list(d: dict, id: int, name: str):
+    if(d.get(id)):
+        d[id].append(name)
+    else:
+        d[id] = [name]
 
 def plot_diff_from_mean(league_id: int):
     league_info = fetch_league_info(league_id)
@@ -144,8 +205,12 @@ if __name__ == '__main__':
     ph_team_id = 3269989
     bad_id = 7152828
     #fetch_current_season(ph_team_id)
-    plot_diff_from_mean(stebbi_league)
+    # plot_diff_from_mean(stebbi_league)
     #fetch_picks(ph_team_id, 20)
     # print(extract_all_player_names(None))
     # fetch_player_info(307)
-    show(plot_diff_from_mean(breidholt_league_id))
+    # show(plot_diff_from_mean(breidholt_league_id))
+    #fetch_league_info(breidholt_league_id)
+    # player_selections_across_league(breidholt_league_id)
+    # print(element_names())
+    player_points(fetcht_current_gameweek())

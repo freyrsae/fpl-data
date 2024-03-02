@@ -1,13 +1,13 @@
 from functools import cache
-import requests, json
+import requests
 from pprint import pprint
 from dataclasses import dataclass
-from bokeh.plotting import figure, show, output_file
+from bokeh.plotting import figure
 from bokeh.models import HoverTool
 from bokeh.palettes import Category20_20
 import pandas as pd
 from pandas import DataFrame
-from bokeh.models import ColumnDataSource, Div, Select, Slider, TextInput
+from bokeh.models import ColumnDataSource
 
 base_url = 'https://fantasy.premierleague.com/api/'
 
@@ -47,15 +47,12 @@ def fetcht_current_gameweek() -> int:
 @cache
 def fetch_bootstrap_static():
     r = requests.get(base_url + f"bootstrap-static/").json()
-    # pprint(r, indent=2, depth=3, compact=True)
+    # pprint(r['events'], indent=2, depth=3, compact=True)
     return r
 
 @cache
-def fetch_events():
-    return [e['id'] for e in fetch_bootstrap_static()['events'] if e['average_entry_score'] > 0]
-
-def extract_all_player_names() -> DataFrame:
-    return DataFrame.from_dict({p['id']: {'display_name': p['web_name']} for p in fetch_bootstrap_static()['elements']}, orient='index')
+def fetch_events() -> list[int]:
+    return [e['id'] for e in fetch_bootstrap_static()['events'] if e['finished'] or e['is_current']]
 
 # fpl api returns value as ints, so e.g. 4.5M is returned as 45
 def format_value(v: int) -> str:
@@ -83,10 +80,6 @@ def fetch_current_season(team_id: int) -> list[Week]:
                 value=format_value(w['value'])
             ) for w in r['current']]
 
-def fetch_player_info(player_id: int):
-    r = requests.get(base_url + f"element-summary/{player_id}").json()
-    pprint(r, indent=2, depth=3, compact=True)
-
 @cache
 def element_names() -> dict[int, str]:
     return {e['id']: e['web_name'] for e in fetch_bootstrap_static()['elements']}
@@ -98,6 +91,7 @@ class Pick:
     is_vice_captain: bool
     multiplier: int
 
+@cache
 def fetch_picks(manager_id: int, event_id: int):
     r = requests.get(base_url + f"entry/{manager_id}/event/{event_id}/picks/").json()
     # pprint(r, indent=2, depth=3, compact=True)
@@ -117,10 +111,11 @@ def player_points(event_id: int) -> dict[int, int]:
     # pprint(r, indent=2, depth=3, compact=True)
     return {e['id']: e['stats']['total_points']for e in r['elements']}
 
-def player_selections_across_league(league_id: int):
+@cache
+def player_selections_across_league(league_id: int, gw: int):
     league_info = fetch_league_info(league_id)
-    gw = fetcht_current_gameweek()
     names = {}
+    ownership = {}
     points = {}
     player_selections = {}
     captain_selections = {}
@@ -129,6 +124,16 @@ def player_selections_across_league(league_id: int):
     for entry in league_info.entries:
         current_picks = fetch_picks(entry.team_id, gw)
         for pick in current_picks:
+
+            if not ownership.get(pick.element):
+                ownership[pick.element] = 0
+            ownership[pick.element] += 1
+
+            if (not names.get(pick.element)):
+                names[pick.element] = element_names()[pick.element]
+            if (not points.get(pick.element)):
+                points[pick.element] = player_points(gw)[pick.element]
+
             if pick.is_captain:
                 add_to_dict_list(captain_selections, pick.element, entry.name)
             elif pick.is_vice_captain:
@@ -138,13 +143,8 @@ def player_selections_across_league(league_id: int):
             elif pick.multiplier == 0:
                 add_to_dict_list(bench_selections, pick.element, entry.name)
 
-            if(not names.get(pick.element)):
-                names[pick.element] = element_names()[pick.element]
-            if (not points.get(pick.element)):
-                points[pick.element] = player_points(gw)[pick.element]
-
-    df = pd.concat([pd.Series(d) for d in [captain_selections, vice_captain_selections, player_selections, bench_selections, names, points]], axis=1)
-    df.columns = ['captain', 'vice captain', 'normal', 'bench', 'name', 'points']
+    df = pd.concat([pd.Series(d) for d in [captain_selections, vice_captain_selections, player_selections, bench_selections, names, points, ownership]], axis=1)
+    df.columns = ['captain', 'vice captain', 'starter', 'bench', 'name', 'points', '# owners']
     return df
 
 def add_to_dict_list(d: dict, id: int, name: str):
@@ -153,6 +153,7 @@ def add_to_dict_list(d: dict, id: int, name: str):
     else:
         d[id] = [name]
 
+@cache
 def plot_diff_from_mean(league_id: int):
     league_info = fetch_league_info(league_id)
 
@@ -203,14 +204,3 @@ if __name__ == '__main__':
     breidholt_league_id = 1138337
     stebbi_league = 134779
     ph_team_id = 3269989
-    bad_id = 7152828
-    #fetch_current_season(ph_team_id)
-    # plot_diff_from_mean(stebbi_league)
-    #fetch_picks(ph_team_id, 20)
-    # print(extract_all_player_names(None))
-    # fetch_player_info(307)
-    # show(plot_diff_from_mean(breidholt_league_id))
-    #fetch_league_info(breidholt_league_id)
-    # player_selections_across_league(breidholt_league_id)
-    # print(element_names())
-    player_points(fetcht_current_gameweek())

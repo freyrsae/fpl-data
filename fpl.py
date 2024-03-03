@@ -1,4 +1,4 @@
-from functools import cache
+import cachetools.func
 import requests
 from pprint import pprint
 from dataclasses import dataclass
@@ -10,6 +10,8 @@ from pandas import DataFrame
 from bokeh.models import ColumnDataSource
 
 base_url = 'https://fantasy.premierleague.com/api/'
+cache_ttl = 60*2
+cache_maxsize = 128
 
 @dataclass
 class Entry:
@@ -40,17 +42,17 @@ def fetch_league_info(league_id: int) -> LeagueInfo:
         entries=[entry_from_standings(e) for e in r['standings']['results']]
     )
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def fetcht_current_gameweek() -> int:
     return min([e['id'] for e in fetch_bootstrap_static()['events'] if e['is_current']])
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def fetch_bootstrap_static():
     r = requests.get(base_url + f"bootstrap-static/").json()
     # pprint(r['events'], indent=2, depth=3, compact=True)
     return r
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def fetch_events() -> list[int]:
     return [e['id'] for e in fetch_bootstrap_static()['events'] if e['finished'] or e['is_current']]
 
@@ -67,7 +69,7 @@ class Week:
     bank: str
     value: str
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def fetch_current_season(team_id: int) -> list[Week]:
     r = requests.get(base_url + f"entry/{team_id}/history/").json()
     # pprint(r, indent=2, depth=3, compact=True)
@@ -80,7 +82,7 @@ def fetch_current_season(team_id: int) -> list[Week]:
                 value=format_value(w['value'])
             ) for w in r['current']]
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def element_names() -> dict[int, str]:
     return {e['id']: e['web_name'] for e in fetch_bootstrap_static()['elements']}
 
@@ -91,10 +93,10 @@ class Pick:
     is_vice_captain: bool
     multiplier: int
 
-@cache
-def fetch_picks(manager_id: int, event_id: int):
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
+def fetch_picks(manager_id: int, event_id: int) -> list[Pick]:
     r = requests.get(base_url + f"entry/{manager_id}/event/{event_id}/picks/").json()
-    # pprint(r, indent=2, depth=3, compact=True)
+    # pprint(r,  indent=2, depth=3, compact=True)
     return [Pick(
                 element=p['element'],
                 is_captain=p['is_captain'],
@@ -105,13 +107,13 @@ def fetch_picks(manager_id: int, event_id: int):
 def prepend_to_events_length(ls: list, n: int, default_value = 0):
     return [default_value] * (n - len(ls)) + ls
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def player_points(event_id: int) -> dict[int, int]:
     r = requests.get(base_url + f"event/{event_id}/live/").json()
     # pprint(r, indent=2, depth=3, compact=True)
     return {e['id']: e['stats']['total_points']for e in r['elements']}
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def player_selections_across_league(league_id: int, gw: int):
     league_info = fetch_league_info(league_id)
     names = {}
@@ -153,7 +155,7 @@ def add_to_dict_list(d: dict, id: int, name: str):
     else:
         d[id] = [name]
 
-@cache
+@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def plot_diff_from_mean(league_id: int):
     league_info = fetch_league_info(league_id)
 
@@ -204,3 +206,4 @@ if __name__ == '__main__':
     breidholt_league_id = 1138337
     stebbi_league = 134779
     ph_team_id = 3269989
+    pprint(fetch_bootstrap_static()['events'], indent=2, depth=3, compact=True)

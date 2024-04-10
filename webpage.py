@@ -1,9 +1,11 @@
 import streamlit as st
 from fpl import plot_diff_from_mean, player_selections_across_league, fetch_events
 
+
+league_id_key = "league_id"
 st.set_page_config(layout="wide")
 try:
-    league_id_q = st.query_params["league_id"]
+    league_id_q = st.query_params[league_id_key]
 except Exception:
     league_id_q = None
     pass
@@ -12,6 +14,7 @@ league_id = st.text_input(label="League ID", value=league_id_q)
 st.markdown("You can find your league ID in the URL on the standings page, e.g. for https://fantasy.premierleague.com/leagues/123456/standings/c then 123456 is the league id")
 
 if league_id:
+    st.query_params[league_id_key] = league_id
     st.markdown('## Points throughout the season')
     st.bokeh_chart(plot_diff_from_mean(int(league_id)), use_container_width=True)
 

@@ -113,9 +113,7 @@ def player_points(event_id: int) -> dict[int, int]:
     # pprint(r, indent=2, depth=3, compact=True)
     return {e['id']: e['stats']['total_points']for e in r['elements']}
 
-@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
-def player_selections_across_league(league_id: int, gw: int):
-    league_info = fetch_league_info(league_id)
+def player_selections_across_league(entries: list[Entry], gw: int):
     names = {}
     ownership = {}
     points = {}
@@ -123,7 +121,7 @@ def player_selections_across_league(league_id: int, gw: int):
     captain_selections = {}
     vice_captain_selections = {}
     bench_selections = {}
-    for entry in league_info.entries:
+    for entry in entries:
         current_picks = fetch_picks(entry.team_id, gw)
         for pick in current_picks:
 
@@ -155,26 +153,26 @@ def add_to_dict_list(d: dict, id: int, name: str):
     else:
         d[id] = [name]
 
-@cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
-def plot_diff_from_mean(league_id: int):
-    league_info = fetch_league_info(league_id)
+# @cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
+def plot_diff_from_mean(entries: list[Entry]):
+    # league_info = fetch_league_info(league_id)
 
     # Sample data for plotting
     x = fetch_events()
     n_events = len(x)
 
-    p = figure(title=league_info.name, x_axis_label='Week', y_axis_label='Total points diff from mean', width=1400,
+    p = figure(x_axis_label='Week', y_axis_label='Total points diff from mean', width=1400,
                height=900)
     total_points_dict = {}
 
-    for entry in league_info.entries:
+    for entry in entries:
         season = fetch_current_season(entry.team_id)
         total_points_dict[entry.name] = prepend_to_events_length([w.total_points for w in season], n_events)
 
     df = DataFrame(total_points_dict)
     df['weekly_mean'] = df.mean(axis=1)
 
-    for entry in league_info.entries:
+    for entry in entries:
         season = fetch_current_season(entry.team_id)
         color = Category20_20[entry.rank%20]
         diff_from_mean = df[entry.name] - df['weekly_mean'].round(0)

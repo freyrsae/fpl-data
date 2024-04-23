@@ -68,10 +68,12 @@ class Week:
     points_on_bench: int
     bank: str
     value: str
+    chip: str | None
 
 @cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
 def fetch_current_season(team_id: int) -> list[Week]:
     r = requests.get(base_url + f"entry/{team_id}/history/").json()
+    chips = {c['event']: c['name'] for c in r['chips']}
     # pprint(r, indent=2, depth=3, compact=True)
     return [Week(
                 event=w['event'],
@@ -79,7 +81,8 @@ def fetch_current_season(team_id: int) -> list[Week]:
                 points=w['points'],
                 points_on_bench=w['points_on_bench'],
                 bank=format_value(w['bank']),
-                value=format_value(w['value'])
+                value=format_value(w['value']),
+                chip=chips.get(w['event'])
             ) for w in r['current']]
 
 @cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
@@ -184,9 +187,12 @@ def plot_diff_from_mean(entries: list[Entry]):
             weekly_points=prepend_to_events_length([w.points for w in season], n_events),
             points_on_bench=prepend_to_events_length([w.points_on_bench for w in season], n_events),
             value=prepend_to_events_length([w.value for w in season], n_events),
-            bank=prepend_to_events_length([w.bank for w in season], n_events)
+            bank=prepend_to_events_length([w.bank for w in season], n_events),
+            chip=prepend_to_events_length([w.chip if w.chip else '-' for w in season], n_events),
+            marker=prepend_to_events_length(['star' if w.chip else 'circle' for w in season], n_events),
+            size=prepend_to_events_length([15 if w.chip else 10 for w in season], n_events),
         ))
-        p.circle(x="x", y="y", source=source, size=10, color=color)
+        p.scatter(x="x", y="y", source=source, marker='marker', size='size', color=color)
 
     TOOLTIPS = [
         ("Total points", "@total_points"),
@@ -194,6 +200,7 @@ def plot_diff_from_mean(entries: list[Entry]):
         ("Bench Points", "@points_on_bench"),
         ("Team Value", "@value"),
         ("Bank", "@bank"),
+        ("Chip", "@chip"),
     ]
     hover = HoverTool(tooltips=TOOLTIPS)
     p.add_tools(hover)
@@ -204,4 +211,7 @@ if __name__ == '__main__':
     breidholt_league_id = 1138337
     stebbi_league = 134779
     ph_team_id = 3269989
-    pprint(fetch_bootstrap_static()['events'], indent=2, depth=3, compact=True)
+    tms_team_id = 6376860
+    # pprint(fetch_bootstrap_static()['events'], indent=2, depth=3, compact=True)
+    print(fetch_league_info(breidholt_league_id))
+    print(fetch_current_season(tms_team_id))

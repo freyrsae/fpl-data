@@ -3,7 +3,7 @@ from fpl import plot_diff_from_mean, player_selections_across_league, fetch_even
 
 
 league_id_key = "league_id"
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_icon="⚽️")
 try:
     league_id_q = st.query_params[league_id_key]
 except Exception:

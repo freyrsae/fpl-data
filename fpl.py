@@ -107,7 +107,7 @@ def fetch_picks(manager_id: int, event_id: int) -> list[Pick]:
                 multiplier=p['multiplier'],
             ) for p in r['picks']]
 
-def prepend_to_events_length(ls: list, n: int, default_value = 0):
+def prepend_to_events_length(ls: list, n: int, default_value):
     return [default_value] * (n - len(ls)) + ls
 
 @cachetools.func.ttl_cache(maxsize=cache_maxsize, ttl=cache_ttl)
@@ -170,7 +170,7 @@ def plot_diff_from_mean(entries: list[Entry]):
 
     for entry in entries:
         season = fetch_current_season(entry.team_id)
-        total_points_dict[entry.name] = prepend_to_events_length([w.total_points for w in season], n_events)
+        total_points_dict[entry.name] = prepend_to_events_length([w.total_points for w in season], n_events, 0)
 
     df = DataFrame(total_points_dict)
     df['weekly_mean'] = df.mean(axis=1)
@@ -183,14 +183,14 @@ def plot_diff_from_mean(entries: list[Entry]):
         source = ColumnDataSource(data=dict(
             x=x,
             y=diff_from_mean,
-            total_points=prepend_to_events_length([w.total_points for w in season], n_events),
-            weekly_points=prepend_to_events_length([w.points for w in season], n_events),
-            points_on_bench=prepend_to_events_length([w.points_on_bench for w in season], n_events),
-            value=prepend_to_events_length([w.value for w in season], n_events),
-            bank=prepend_to_events_length([w.bank for w in season], n_events),
-            chip=prepend_to_events_length([w.chip if w.chip else '-' for w in season], n_events),
-            marker=prepend_to_events_length(['star' if w.chip else 'circle' for w in season], n_events),
-            size=prepend_to_events_length([15 if w.chip else 10 for w in season], n_events),
+            total_points=prepend_to_events_length([w.total_points for w in season], n_events, 0),
+            weekly_points=prepend_to_events_length([w.points for w in season], n_events, 0),
+            points_on_bench=prepend_to_events_length([w.points_on_bench for w in season], n_events, 0),
+            value=prepend_to_events_length([w.value for w in season], n_events, 0),
+            bank=prepend_to_events_length([w.bank for w in season], n_events, 0),
+            chip=prepend_to_events_length([w.chip if w.chip else '-' for w in season], n_events, None),
+            marker=prepend_to_events_length(['star' if w.chip else 'circle' for w in season], n_events, 'circle'),
+            size=prepend_to_events_length([15 if w.chip else 10 for w in season], n_events, 10),
         ))
         p.scatter(x="x", y="y", source=source, marker='marker', size='size', color=color)
 

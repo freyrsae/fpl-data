@@ -25,6 +25,8 @@ if league_id:
         default=league_info.entries,
         format_func=lambda x: x.name)
 
+    st.markdown('## Points throughout the season')
+    st.bokeh_chart(plot_diff_from_mean(teams_to_show), use_container_width=True)
 
     st.markdown('## Gameweek player selection')
     events = fetch_events()
@@ -33,7 +35,4 @@ if league_id:
         player_selections_across_league(teams_to_show, gw).sort_values(by=['# owners'], ascending=False),
         use_container_width=True, hide_index=True, column_order=['name', '# owners', 'points', 'captain', 'vice captain', 'starter', 'bench']
     )
-
-    st.markdown('## Points throughout the season')
-    st.bokeh_chart(plot_diff_from_mean(teams_to_show), use_container_width=True)
 

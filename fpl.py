@@ -35,7 +35,11 @@ class LeagueInfo:
     entries: list[Entry]
 
 def fetch_league_info(league_id: int) -> LeagueInfo:
-    r = requests.get(base_url + f"leagues-classic/{league_id}/standings/").json()
+    r: dict = requests.get(base_url + f"leagues-classic/{league_id}/standings/").json()
+    if "league" not in r:
+        r = requests.get(base_url + f"leagues-h2h/{league_id}/standings").json()
+    if "league" not in r:
+        raise ValueError(f"Could not find data for league_id: {league_id}")
     return LeagueInfo(
         id=r["league"]['id'],
         name=r["league"]["name"],
@@ -212,6 +216,7 @@ if __name__ == '__main__':
     stebbi_league = 134779
     ph_team_id = 3269989
     tms_team_id = 6376860
+    h2h_league = 735303
     # pprint(fetch_bootstrap_static()['events'], indent=2, depth=3, compact=True)
     print(fetch_league_info(breidholt_league_id))
-    print(fetch_current_season(tms_team_id))
+    print(fetch_league_info(h2h_league))

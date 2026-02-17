@@ -1,5 +1,5 @@
 streamlit
-bokeh==2.4.3
+streamlit-bokeh
 pandas
 cachetools
 numpy==1.26.4

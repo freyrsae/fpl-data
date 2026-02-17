@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_bokeh import streamlit_bokeh
 from fpl import plot_diff_from_mean, player_selections_across_league, fetch_events, fetch_league_info
 
 
@@ -26,7 +27,7 @@ if league_id:
         format_func=lambda x: x.name)
 
     st.markdown('## Points throughout the season')
-    st.bokeh_chart(plot_diff_from_mean(teams_to_show), use_container_width=True)
+    streamlit_bokeh(plot_diff_from_mean(teams_to_show), use_container_width=True)
 
     st.markdown('## Gameweek player selection')
     events = fetch_events()
